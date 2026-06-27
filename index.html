@@ -551,7 +551,7 @@ const hpClass = (hp) => hp <= 25 ? 'crit' : hp <= 50 ? 'low' : '';
 let soundOn = true;
 let bgmOn = true;
 const SFX_FILES = ['click','switch','hit_neutral','hit_super','hit_mega','hit_resist','hit_immune','faint','newOpp','win','lose'];
-const BGM_FILES = ['bgm_lobby','bgm_battle','bgm_battle_hard','bgm_result'];
+const BGM_FILES = ['karasuba','yukari'];
 const sfxPool = {};
 const bgmPool = {};
 let sfxReady = false;
@@ -566,7 +566,7 @@ function initSfx() {
     sfxPool[name] = a;
   });
   BGM_FILES.forEach(name => {
-    const a = new Audio(`/sounds/${name}.ogg`);
+    const a = new Audio(`/sounds/${name}.mp3`);
     a.preload = 'auto';
     a.loop = true;
     a.volume = 0.25;
@@ -647,10 +647,10 @@ function shakeCard(side, mult) {
 
 function updateBgmForPhase() {
   if (!state) return;
-  if (state.phase === 'lead-select') playBgm('bgm_lobby');
-  else if (state.phase === 'win' || state.phase === 'lose') playBgm('bgm_result');
+  if (state.phase === 'lead-select') playBgm('karasuba');
+  else if (state.phase === 'win' || state.phase === 'lose') playBgm('karasuba');
   else if (state.phase === 'battle' || state.phase === 'switch-menu' || state.phase === 'forceSwitch') {
-    playBgm(state.level >= 3 ? 'bgm_battle_hard' : 'bgm_battle');
+    playBgm('yukari');
   }
 }
 
