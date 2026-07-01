@@ -1049,6 +1049,8 @@ function winMatch() {
     perfect: state.matchForceSwitches === 0,
     solo: state.matchSwitches === 0,
   };
+  // matchScore は score に取り込み済み。ヘッダー表示(score+matchScore)の二重計上を防ぐため 0 に
+  state.matchScore = 0;
   if (state.score > state.bestScore) {
     state.bestScore = state.score;
     localStorage.setItem(`poke-trainer-best-score-${state.mode}`, String(state.bestScore));
@@ -1069,6 +1071,8 @@ function loseMatch(deathType) {
     beforeMult: state.matchScore, mult: 1,
     perfect: false, solo: false,
   };
+  // matchScore は score に取り込み済み。ヘッダー二重計上を防ぐため 0 に
+  state.matchScore = 0;
   if (state.score > state.bestScore) {
     state.bestScore = state.score;
     localStorage.setItem(`poke-trainer-best-score-${state.mode}`, String(state.bestScore));
