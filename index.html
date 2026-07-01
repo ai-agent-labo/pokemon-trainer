@@ -551,13 +551,8 @@ const hpClass = (hp) => hp <= 25 ? 'crit' : hp <= 50 ? 'low' : '';
 let soundOn = true;
 let bgmOn = true;
 const SFX_FILES = ['click','switch','hit_neutral','hit_super','hit_mega','hit_resist','hit_immune','faint','newOpp','win','lose'];
-const BGM_FILES = ['karasuba','yukari'];
-// レベルごとの BGM プレイリスト (現状の Lv 1-2 / 3-4 区分に合わせる)
-const BGM_POOLS = {
-  light: ['karasuba'],
-  hard:  ['yukari'],
-};
-let bgmPoolName = null;
+// BGM: 4曲を区切りなく連続ループ (battle1→2→3→boss→battle1…)
+const BGM_PLAYLIST = ['battle1','battle2','battle3','boss'];
 let bgmIdx = 0;
 const sfxPool = {};
 const bgmPool = {};
@@ -572,8 +567,8 @@ function initSfx() {
     a.volume = 0.6;
     sfxPool[name] = a;
   });
-  BGM_FILES.forEach(name => {
-    const a = new Audio(`/sounds/${name}.mp3`);
+  BGM_PLAYLIST.forEach(name => {
+    const a = new Audio(`/sounds/cc0-bgm/${name}.mp3`);
     a.preload = 'auto';
     a.loop = false; // 終わったら手動で次曲へ
     a.volume = 0.25;
@@ -581,14 +576,11 @@ function initSfx() {
     bgmPool[name] = a;
   });
 }
-function bgmPoolForLevel(level) {
-  return level >= 3 ? 'hard' : 'light';
-}
 function onBgmEnded() {
-  if (!bgmOn || !bgmPoolName) return;
-  const pool = BGM_POOLS[bgmPoolName];
-  bgmIdx = (bgmIdx + 1) % pool.length;
-  playBgmTrack(pool[bgmIdx]);
+  if (!bgmOn) return;
+  // 曲が終わったらプレイリストの次曲へ (末尾→先頭でループ)
+  bgmIdx = (bgmIdx + 1) % BGM_PLAYLIST.length;
+  playBgmTrack(BGM_PLAYLIST[bgmIdx]);
 }
 function sfx(kind) {
   if (!soundOn) return;
@@ -662,15 +654,12 @@ function shakeCard(side, mult) {
   setTimeout(() => el.classList.remove(`shake-${intensity}`, 'flash-red', 'flash-rainbow', 'flash-gray'), dur + 30);
 }
 
-// レベル境界でのみ BGM を切替。フェーズ変化では干渉しない (今かかってる曲が終わるまで継続)
-function updateBgmForLevel() {
-  if (!state || !bgmOn) return;
-  const newPool = bgmPoolForLevel(state.level);
-  // 同じ pool で何か再生中ならそのまま続行
-  if (bgmPoolName === newPool && currentBgm && !currentBgm.paused) return;
-  bgmPoolName = newPool;
-  bgmIdx = 0;
-  playBgmTrack(BGM_POOLS[newPool][0]);
+// レベル/フェーズに関係なく、プレイリストが止まっていたら再生を開始するだけ
+function ensureBgm() {
+  if (!bgmOn) return;
+  if (currentBgm && !currentBgm.paused) return; // 既に再生中なら何もしない
+  initSfx();
+  playBgmTrack(BGM_PLAYLIST[bgmIdx]);
 }
 
 // ── スコア定義 ────────────────────────────────
@@ -1100,12 +1089,10 @@ function toggleBgm() {
   localStorage.setItem('poke-trainer-bgm', bgmOn ? '1' : '0');
   if (bgmOn) {
     initSfx();
-    // pool 同一なら resume、違ければ updateBgmForLevel で切替
-    const newPool = state ? bgmPoolForLevel(state.level) : null;
-    if (newPool && bgmPoolName === newPool && currentBgm && currentBgm.paused) {
-      currentBgm.play().catch(() => {});
+    if (currentBgm && currentBgm.paused) {
+      currentBgm.play().catch(() => {});   // 止めた曲を同じ位置から再開
     } else {
-      updateBgmForLevel();
+      ensureBgm();
     }
   }
   else stopBgm();
@@ -1345,7 +1332,7 @@ function debugJump() {
 }
 
 function render() {
-  updateBgmForLevel();
+  ensureBgm();
   const app = document.getElementById('app');
 
   if (state.phase === 'lead-select') {
