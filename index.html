@@ -1215,7 +1215,6 @@ function header() {
       <button class="sound-toggle ${soundOn ? 'on' : ''}" onclick="toggleSound()">${soundOn ? '🔊 SE' : '🔇 SE'}</button>
       <button class="sound-toggle ${bgmOn ? 'on' : ''}" onclick="toggleBgm()">${bgmOn ? '🎵 BGM' : '🚫 BGM'}</button>
       <button class="sound-toggle ${gameSpeed < 1 ? 'on' : ''}" onclick="toggleSpeed()">${gameSpeed < 1 ? '⏩ はやい' : '🐢 ふつう'}</button>
-      <button class="sound-toggle" onclick="debugJump()" title="任意の試合番号にジャンプ" style="border-color:var(--accent);color:var(--accent);">🐛 jump</button>
     </div>
   </div>`;
 }
@@ -1314,20 +1313,6 @@ function surrender() {
   if (!killer) return;
   pushLog('降参した…', 'fall');
   loseMatch(killer.type);
-  render();
-}
-
-function debugJump() {
-  const input = prompt('何試合目に飛びますか? (1-100)\n※ スコアは0にリセット、連勝も置き換え');
-  if (input === null) return;
-  const n = parseInt(input, 10);
-  if (isNaN(n) || n < 1 || n > 200) return;
-  state.streak = n - 1;
-  state.score = 0;
-  state.matchScore = 0;
-  state.lastMatchSummary = null;
-  resetAnimState();
-  dealNewMatch();
   render();
 }
 

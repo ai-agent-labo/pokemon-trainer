@@ -114,8 +114,7 @@ pokemon-trainer/
 
 ## 開発者向けデバッグ
 
-- ヘッダー右上 **🐛 jump** で任意試合数にジャンプ (Lv 確認用)
-- ヘッダーの SE / BGM / スピード切替ボタンも localStorage 保存
+- ヘッダーの SE / BGM / スピード切替ボタンは localStorage 保存
 - localStorage 全クリアで完全リセット
 
 ## 関連プロジェクト
