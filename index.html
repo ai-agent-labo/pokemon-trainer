@@ -393,6 +393,9 @@ body { color: var(--text); font-family: 'Zen Maru Gothic', 'Hiragino Maru Gothic
 .versus { text-align: center; color: var(--muted); font-size: 12px; margin: 8px 0; font-weight: 800; letter-spacing: .1em; }
 .sound-toggle { background: var(--card); border: 1px solid var(--border); color: var(--muted); font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-weight: 700; font-family: inherit; }
 .sound-toggle.on { color: var(--green); border-color: var(--green); }
+.vol-ctrl { display: flex; align-items: center; gap: 6px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; }
+.vol-ctrl .vol-ico { font-size: 10px; font-weight: 700; color: var(--muted); white-space: nowrap; min-width: 42px; }
+.vol-ctrl input[type=range] { width: 64px; min-width: 48px; height: 4px; accent-color: var(--green); cursor: pointer; margin: 0; }
 </style>
 </head>
 <body>
@@ -548,9 +551,12 @@ const effText = (m) => {
 const hpClass = (hp) => hp <= 25 ? 'crit' : hp <= 50 ? 'low' : '';
 
 // ── サウンド (ファイル再生) ────────────────────────
-let soundOn = true;
-let bgmOn = true;
+let sfxVolume = 0.6; // SE 音量 0..1
+let bgmVolume = 0;   // BGM 音量 0..1 (デフォルト OFF)
+const clamp01 = (v) => Math.max(0, Math.min(1, v || 0));
 const SFX_FILES = ['click','switch','hit_neutral','hit_super','hit_mega','hit_resist','hit_immune','faint','newOpp','win','lose'];
+// 自作差し替え音は mp3、それ以外は ogg
+const SFX_EXT = { click:'mp3', hit_super:'mp3', hit_mega:'mp3', win:'mp3', lose:'mp3' };
 // BGM: 4曲を区切りなく連続ループ (battle1→2→3→boss→battle1…)
 const BGM_PLAYLIST = ['battle1','battle2','battle3','boss'];
 let bgmIdx = 0;
@@ -562,37 +568,37 @@ function initSfx() {
   if (sfxReady) return;
   sfxReady = true;
   SFX_FILES.forEach(name => {
-    const a = new Audio(`/sounds/${name}.ogg`);
+    const a = new Audio(`/sounds/${name}.${SFX_EXT[name] || 'ogg'}`);
     a.preload = 'auto';
-    a.volume = 0.6;
+    a.volume = sfxVolume;
     sfxPool[name] = a;
   });
   BGM_PLAYLIST.forEach(name => {
     const a = new Audio(`/sounds/cc0-bgm/${name}.mp3`);
     a.preload = 'auto';
     a.loop = false; // 終わったら手動で次曲へ
-    a.volume = 0.25;
+    a.volume = bgmVolume;
     a.addEventListener('ended', onBgmEnded);
     bgmPool[name] = a;
   });
 }
 function onBgmEnded() {
-  if (!bgmOn) return;
+  if (bgmVolume <= 0) return;
   // 曲が終わったらプレイリストの次曲へ (末尾→先頭でループ)
   bgmIdx = (bgmIdx + 1) % BGM_PLAYLIST.length;
   playBgmTrack(BGM_PLAYLIST[bgmIdx]);
 }
 function sfx(kind) {
-  if (!soundOn) return;
+  if (sfxVolume <= 0) return;
   initSfx();
   const src = sfxPool[kind];
   if (!src) return;
   const a = src.cloneNode();
-  a.volume = src.volume;
+  a.volume = sfxVolume;
   a.play().catch(() => {});
 }
 function playBgmTrack(name) {
-  if (!bgmOn) return;
+  if (bgmVolume <= 0) return;
   initSfx();
   const target = bgmPool[name];
   if (!target) return;
@@ -656,7 +662,7 @@ function shakeCard(side, mult) {
 
 // レベル/フェーズに関係なく、プレイリストが止まっていたら再生を開始するだけ
 function ensureBgm() {
-  if (!bgmOn) return;
+  if (bgmVolume <= 0) return;
   if (currentBgm && !currentBgm.paused) return; // 既に再生中なら何もしない
   initSfx();
   playBgmTrack(BGM_PLAYLIST[bgmIdx]);
@@ -756,10 +762,10 @@ let state = null;
 let busy = false;
 
 function newGame() {
-  const savedSfx = localStorage.getItem('poke-trainer-sound');
-  if (savedSfx !== null) soundOn = savedSfx === '1';
-  const savedBgm = localStorage.getItem('poke-trainer-bgm');
-  if (savedBgm !== null) bgmOn = savedBgm === '1';
+  const savedSfx = localStorage.getItem('poke-trainer-sfxvol');
+  if (savedSfx !== null) sfxVolume = clamp01(parseFloat(savedSfx));
+  const savedBgm = localStorage.getItem('poke-trainer-bgmvol');
+  if (savedBgm !== null) bgmVolume = clamp01(parseFloat(savedBgm));
   const savedSpeed = localStorage.getItem('poke-trainer-speed');
   if (savedSpeed !== null) gameSpeed = parseFloat(savedSpeed) || 1;
   const mode = localStorage.getItem('poke-trainer-mode') || 'mono';
@@ -1082,25 +1088,28 @@ function loseMatch(deathType) {
 }
 function nextMatch() { sfx('click'); dealNewMatch(); render(); }
 function resetRun() { sfx('click'); state.streak = 0; state.score = 0; state.lastMatchSummary = null; resetAnimState(); dealNewMatch(); render(); }
-function toggleSound() {
-  soundOn = !soundOn;
-  localStorage.setItem('poke-trainer-sound', soundOn ? '1' : '0');
-  if (soundOn) { initSfx(); sfx('click'); }
-  render();
+function setSfxVolume(v) {
+  sfxVolume = clamp01(v);
+  localStorage.setItem('poke-trainer-sfxvol', String(sfxVolume));
+  syncVolIcons();
 }
-function toggleBgm() {
-  bgmOn = !bgmOn;
-  localStorage.setItem('poke-trainer-bgm', bgmOn ? '1' : '0');
-  if (bgmOn) {
+function setBgmVolume(v) {
+  bgmVolume = clamp01(v);
+  localStorage.setItem('poke-trainer-bgmvol', String(bgmVolume));
+  if (bgmVolume > 0) {
     initSfx();
-    if (currentBgm && currentBgm.paused) {
-      currentBgm.play().catch(() => {});   // 止めた曲を同じ位置から再開
-    } else {
-      ensureBgm();
-    }
+    Object.values(bgmPool).forEach(a => { a.volume = bgmVolume; });
+    if (currentBgm && currentBgm.paused) currentBgm.play().catch(() => {});
+    else ensureBgm();
+  } else {
+    stopBgm();
   }
-  else stopBgm();
-  render();
+  syncVolIcons();
+}
+// スライダー操作中は再描画せずアイコンだけ更新 (掴みが外れないように)
+function syncVolIcons() {
+  const s = document.getElementById('sfx-ico'); if (s) s.textContent = (sfxVolume > 0 ? '🔊' : '🔇') + ' SE';
+  const b = document.getElementById('bgm-ico'); if (b) b.textContent = (bgmVolume > 0 ? '🎵' : '🚫') + ' BGM';
 }
 function toggleSpeed() {
   gameSpeed = gameSpeed >= 1 ? 0.6 : 1;
@@ -1216,8 +1225,8 @@ function header() {
     </div>
     <div style="display:flex;flex-direction:column;gap:4px;">
       <button class="sound-toggle on" onclick="switchMode('${state.mode === 'mono' ? 'dual' : 'mono'}')" style="border-color:var(--yellow);color:var(--yellow);">${state.mode === 'mono' ? '🎯 単タイプ' : '🌀 複合タイプ'}</button>
-      <button class="sound-toggle ${soundOn ? 'on' : ''}" onclick="toggleSound()">${soundOn ? '🔊 SE' : '🔇 SE'}</button>
-      <button class="sound-toggle ${bgmOn ? 'on' : ''}" onclick="toggleBgm()">${bgmOn ? '🎵 BGM' : '🚫 BGM'}</button>
+      <div class="vol-ctrl"><span id="sfx-ico" class="vol-ico">${sfxVolume > 0 ? '🔊' : '🔇'} SE</span><input type="range" min="0" max="100" value="${Math.round(sfxVolume*100)}" oninput="setSfxVolume(this.value/100)" onchange="if(sfxVolume>0){initSfx();sfx('click');}"></div>
+      <div class="vol-ctrl"><span id="bgm-ico" class="vol-ico">${bgmVolume > 0 ? '🎵' : '🚫'} BGM</span><input type="range" min="0" max="100" value="${Math.round(bgmVolume*100)}" oninput="setBgmVolume(this.value/100)"></div>
       <button class="sound-toggle ${gameSpeed < 1 ? 'on' : ''}" onclick="toggleSpeed()">${gameSpeed < 1 ? '⏩ はやい' : '🐢 ふつう'}</button>
     </div>
   </div>`;
